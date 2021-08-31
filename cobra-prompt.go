@@ -71,10 +71,8 @@ func findSuggestions(co CobraPrompt, d prompt.Document) []prompt.Suggest {
 		if flag.Hidden {
 			return
 		}
-		if strings.HasPrefix(d.GetWordBeforeCursor(), "--") {
+		if flag.Name != "help" {
 			suggestions = append(suggestions, prompt.Suggest{Text: "--" + flag.Name, Description: flag.Usage})
-		} else if strings.HasPrefix(d.GetWordBeforeCursor(), "-") && flag.Shorthand != "" {
-			suggestions = append(suggestions, prompt.Suggest{Text: "-" + flag.Shorthand, Description: flag.Usage})
 		}
 	}
 
