@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/hashicorp/consul/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -27,6 +28,8 @@ type CobraPrompt struct {
 
 	// ResetFlagsFlag will add a new persistent flag to RootCmd. This flags can be used to turn off flags value reset
 	ResetFlagsFlag bool
+
+	Consul *api.Client
 }
 
 // Run will automatically generate suggestions for all cobra commands and flags defined by RootCmd
@@ -63,6 +66,7 @@ func findSuggestions(co CobraPrompt, d prompt.Document) []prompt.Suggest {
 	}
 
 	var suggestions []prompt.Suggest
+
 	resetFlags, _ := command.Flags().GetBool("flags-no-reset")
 	addFlags := func(flag *pflag.Flag) {
 		if flag.Changed && !resetFlags {
@@ -91,5 +95,10 @@ func findSuggestions(co CobraPrompt, d prompt.Document) []prompt.Suggest {
 	if co.DynamicSuggestionsFunc != nil && annotation != "" {
 		suggestions = append(suggestions, co.DynamicSuggestionsFunc(annotation, d)...)
 	}
+
+	if suggests, found := completeOptionArguments(d, co); found {
+		return suggests
+	}
+
 	return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
 }
