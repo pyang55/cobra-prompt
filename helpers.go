@@ -33,7 +33,6 @@ func GetPlatformId(c *api.Client) []prompt.Suggest {
 }
 
 func GetPlatformNames(c *api.Client) []prompt.Suggest {
-
 	filterName := fmt.Sprintf("Meta.app == \"platform\"")
 	nodes, _, err := c.Catalog().Nodes(&api.QueryOptions{Filter: filterName})
 	if err != nil {
@@ -75,27 +74,24 @@ func checkProfile(d prompt.Document) (string, bool) {
 }
 
 func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Suggest, bool) {
-	var client *api.Client
 	_, option, found := getPreviousOption(d)
 	if !found {
 		return []prompt.Suggest{}, false
 	}
 
-	_, suggest := FindProfile()
+	profiles, suggest := FindProfile()
 	entry, prev := checkProfile(d)
 
 	if option == "-id" || option == "--id" {
 		if prev {
-			token, env := GetEnv(entry)
-			client = ConsulInit(token, env, entry)
 			return prompt.FilterFuzzy(
-				GetPlatformId(client),
+				GetPlatformId(co.ClientMap[entry]),
 				d.GetWordBeforeCursor(),
 				true,
 			), true
 		}
 		return prompt.FilterFuzzy(
-			GetPlatformId(co.Consul),
+			GetPlatformId(co.ClientMap[profiles[0]]),
 			d.GetWordBeforeCursor(),
 			true,
 		), true
@@ -104,16 +100,14 @@ func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Sugges
 
 	if option == "-name" || option == "--name" {
 		if prev {
-			token, env := GetEnv(entry)
-			client = ConsulInit(token, env, entry)
 			return prompt.FilterFuzzy(
-				GetPlatformNames(client),
+				GetPlatformNames(co.ClientMap[entry]),
 				d.GetWordBeforeCursor(),
 				true,
 			), true
 		}
 		return prompt.FilterFuzzy(
-			GetPlatformNames(co.Consul),
+			GetPlatformNames(co.ClientMap[profiles[0]]),
 			d.GetWordBeforeCursor(),
 			true,
 		), true
@@ -236,15 +230,6 @@ func GetEnv(profile string) (string, string) {
 		return token, "prod"
 	}
 	return token, "eng"
-}
-
-func ConsulInit(token string, env string, profile string) *api.Client {
-	address := fmt.Sprintf("http://consul-%s.mixmode.ai", env)
-	client, err := api.NewClient(&api.Config{Token: token, Address: address})
-	if err != nil {
-		panic(err)
-	}
-	return client
 }
 
 func contains(s []string, str string) bool {
