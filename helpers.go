@@ -81,42 +81,42 @@ func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Sugges
 		return []prompt.Suggest{}, false
 	}
 
-	profiles, suggest := FindProfile()
+	_, suggest := FindProfile()
 	entry, prev := checkProfile(d)
 	c := cache.New(5*time.Minute, 10*time.Minute)
 
+	// we cache the profile client if we see it
+	if prev {
+		if _, found := c.Get(entry); found {
+			fmt.Println("Already have a client saved")
+		} else {
+			token, env := GetEnv(entry)
+			client := ConsulInit(token, env, entry)
+			c.Set(entry, client, cache.NoExpiration)
+		}
+	}
+
 	if option == "-id" || option == "--id" {
-		if prev {
-			foo, found := c.Get(entry)
-			if found {
-				return prompt.FilterFuzzy(
-					GetPlatformId(foo),
-					d.GetWordBeforeCursor(),
-					true,
-				), true
-			} else {
-				token, env := GetEnv(entry)
-				client := ConsulInit(token, env, entry)
-				c.Set(entry, client)
-				return prompt.FilterFuzzy(
-					GetPlatformId(client),
-					d.GetWordBeforeCursor(),
-					true,
-				), true
-			}
+		if x, found := c.Get(entry); found {
+			client := x.(*api.Client)
+			return prompt.FilterFuzzy(
+				GetPlatformId(client),
+				d.GetWordBeforeCursor(),
+				true,
+			), true
 		}
 		return prompt.FilterFuzzy(
 			GetPlatformId(co.Consul),
 			d.GetWordBeforeCursor(),
 			true,
 		), true
-
 	}
 
 	if option == "-name" || option == "--name" {
-		if prev {
+		if x, found := c.Get(entry); found {
+			client := x.(*api.Client)
 			return prompt.FilterFuzzy(
-				GetPlatformNames(co.Consul),
+				GetPlatformNames(client),
 				d.GetWordBeforeCursor(),
 				true,
 			), true
@@ -126,7 +126,6 @@ func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Sugges
 			d.GetWordBeforeCursor(),
 			true,
 		), true
-
 	}
 
 	if option == "-profile" || option == "--profile" {
