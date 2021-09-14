@@ -29,7 +29,7 @@ type CobraPrompt struct {
 	// ResetFlagsFlag will add a new persistent flag to RootCmd. This flags can be used to turn off flags value reset
 	ResetFlagsFlag bool
 
-	ClientMap map[string]*api.Client
+	Consul *api.Client
 }
 
 // Run will automatically generate suggestions for all cobra commands and flags defined by RootCmd

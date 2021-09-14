@@ -6,12 +6,14 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/c-bata/go-prompt"
 	"github.com/hashicorp/consul/api"
+	"github.com/patrickmn/go-cache"
 )
 
 func GetPlatformId(c *api.Client) []prompt.Suggest {
@@ -81,17 +83,30 @@ func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Sugges
 
 	profiles, suggest := FindProfile()
 	entry, prev := checkProfile(d)
+	c := cache.New(5*time.Minute, 10*time.Minute)
 
 	if option == "-id" || option == "--id" {
 		if prev {
-			return prompt.FilterFuzzy(
-				GetPlatformId(co.ClientMap[entry]),
-				d.GetWordBeforeCursor(),
-				true,
-			), true
+			foo, found := c.Get(entry)
+			if found {
+				return prompt.FilterFuzzy(
+					GetPlatformId(foo),
+					d.GetWordBeforeCursor(),
+					true,
+				), true
+			} else {
+				token, env := GetEnv(entry)
+				client := ConsulInit(token, env, entry)
+				c.Set(entry, client)
+				return prompt.FilterFuzzy(
+					GetPlatformId(client),
+					d.GetWordBeforeCursor(),
+					true,
+				), true
+			}
 		}
 		return prompt.FilterFuzzy(
-			GetPlatformId(co.ClientMap[profiles[0]]),
+			GetPlatformId(co.Consul),
 			d.GetWordBeforeCursor(),
 			true,
 		), true
@@ -101,13 +116,13 @@ func completeOptionArguments(d prompt.Document, co CobraPrompt) ([]prompt.Sugges
 	if option == "-name" || option == "--name" {
 		if prev {
 			return prompt.FilterFuzzy(
-				GetPlatformNames(co.ClientMap[entry]),
+				GetPlatformNames(co.Consul),
 				d.GetWordBeforeCursor(),
 				true,
 			), true
 		}
 		return prompt.FilterFuzzy(
-			GetPlatformNames(co.ClientMap[profiles[0]]),
+			GetPlatformNames(co.Consul),
 			d.GetWordBeforeCursor(),
 			true,
 		), true
@@ -239,4 +254,13 @@ func contains(s []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func ConsulInit(token string, env string, profile string) *api.Client {
+	address := fmt.Sprintf("http://consul-%s.mixmode.ai", env)
+	client, err := api.NewClient(&api.Config{Token: token, Address: address})
+	if err != nil {
+		panic(err)
+	}
+	return client
 }
